@@ -2,7 +2,7 @@ import http.server
 import socketserver
 import os
 
-PORT = 12000  # Используем порт 12000 для work-1
+PORT = 8080  # Используем стандартный порт 8080
 
 class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     
     with socketserver.TCPServer(("0.0.0.0", PORT), Handler) as httpd:
         print(f"Serving at http://0.0.0.0:{PORT}")
-        print(f"Access the game at: https://work-1-rvsekdrbjkhddsnp.prod-runtime.all-hands.dev/")
-        print(f"Direct link to game: https://work-1-rvsekdrbjkhddsnp.prod-runtime.all-hands.dev/tetris.html")
+        print(f"Access the game at: http://localhost:{PORT}/")
+        print(f"Direct link to game: http://localhost:{PORT}/tetris.html")
         print("Press Ctrl+C to stop the server")
         httpd.serve_forever()

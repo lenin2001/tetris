@@ -30,7 +30,7 @@ python server.py
 ```
 
 Затем откройте в браузере:
-http://localhost:12000/
+http://localhost:8080/
 
 ## Технологии
 
