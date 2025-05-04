@@ -167,7 +167,7 @@
         .mobile-controls {
             display: none; /* По умолчанию скрыты */
             flex-direction: column;
-            gap: 10px;
+            gap: 15px;
             margin-top: 20px;
             width: 100%;
             max-width: 300px;
@@ -176,32 +176,63 @@
         .mobile-controls-row {
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: 15px;
         }
         
         .mobile-controls button {
-            width: 60px;
-            height: 60px;
-            font-size: 24px;
+            width: 70px;
+            height: 70px;
+            font-size: 28px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
             color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.5);
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 0;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent; /* Убираем подсветку при тапе на мобильных */
+            user-select: none; /* Запрещаем выделение текста */
+            transition: transform 0.1s, background 0.1s, box-shadow 0.1s;
         }
         
         .mobile-controls button:active {
-            transform: scale(0.95);
-            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.9) translateY(4px);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2));
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
         
         #rotate-btn, #drop-btn {
-            width: 120px;
-            border-radius: 30px;
+            width: 140px;
+            border-radius: 35px;
+            font-weight: bold;
+        }
+        
+        #left-btn {
+            background: linear-gradient(135deg, rgba(0, 116, 217, 0.7), rgba(0, 116, 217, 0.4));
+            border-color: rgba(0, 116, 217, 0.8);
+        }
+        
+        #right-btn {
+            background: linear-gradient(135deg, rgba(0, 116, 217, 0.7), rgba(0, 116, 217, 0.4));
+            border-color: rgba(0, 116, 217, 0.8);
+        }
+        
+        #down-btn {
+            background: linear-gradient(135deg, rgba(255, 133, 27, 0.7), rgba(255, 133, 27, 0.4));
+            border-color: rgba(255, 133, 27, 0.8);
+        }
+        
+        #rotate-btn {
+            background: linear-gradient(135deg, rgba(46, 204, 64, 0.7), rgba(46, 204, 64, 0.4));
+            border-color: rgba(46, 204, 64, 0.8);
+        }
+        
+        #drop-btn {
+            background: linear-gradient(135deg, rgba(255, 65, 54, 0.7), rgba(255, 65, 54, 0.4));
+            border-color: rgba(255, 65, 54, 0.8);
         }
         
         /* Показываем мобильные кнопки только на мобильных устройствах */
@@ -255,11 +286,13 @@
                 <p>↓ : Движение вниз</p>
                 <p>Пробел : Сбросить фигуру</p>
                 <p>P : Пауза</p>
+                <p>Двойной клик: Старт/Пауза</p>
                 <h3>📱 Мобильное управление:</h3>
                 <p>Свайп влево/вправо: Движение</p>
                 <p>Свайп вверх: Вращение</p>
                 <p>Свайп вниз: Сбросить фигуру</p>
                 <p>Тап: Движение вниз</p>
+                <p>Двойной тап: Старт/Пауза</p>
                 <p>Также доступны кнопки управления</p>
             </div>
         </div>
@@ -576,6 +609,27 @@
                 context.fillStyle = 'white';
                 context.textAlign = 'center';
                 context.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2);
+            }
+            
+            // Отображаем подсказку о двойном клике, если игра не начата
+            if (gameOver) {
+                context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                context.font = '30px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.fillText('ТЕТРИС', canvas.width / 2, canvas.height / 2 - 40);
+                
+                context.font = '20px Arial';
+                context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                context.fillText('Двойной клик для начала игры', canvas.width / 2, canvas.height / 2 + 20);
+                
+                // Анимированная подсказка
+                const pulseSize = 1 + 0.1 * Math.sin(Date.now() / 300);
+                context.font = `${Math.floor(24 * pulseSize)}px Arial`;
+                context.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                context.fillText('👆 👆', canvas.width / 2, canvas.height / 2 + 70);
             }
         }
         
@@ -916,20 +970,60 @@
             }
         });
         
-        // Переменные для обработки свайпов
+        // Переменные для обработки свайпов и тапов
         let touchStartX = 0;
         let touchStartY = 0;
         let touchEndX = 0;
         let touchEndY = 0;
+        let lastTapTime = 0;
         
         // Минимальное расстояние для определения свайпа
         const minSwipeDistance = 30;
+        
+        // Обработчик двойного клика для запуска игры
+        canvas.addEventListener('dblclick', function(event) {
+            if (gameOver) {
+                gameOver = false;
+                player.score = 0;
+                score = 0;
+                lines = 0;
+                level = 1;
+                updateScore();
+                playerReset();
+                startButton.textContent = '⏸️ ПАУЗА';
+            } else {
+                togglePause();
+            }
+        });
         
         // Обработчики сенсорных событий для свайпов
         canvas.addEventListener('touchstart', function(event) {
             event.preventDefault(); // Предотвращаем стандартное поведение браузера
             touchStartX = event.changedTouches[0].screenX;
             touchStartY = event.changedTouches[0].screenY;
+            
+            // Добавляем обработку двойного тапа
+            const now = new Date().getTime();
+            const timeSince = now - lastTapTime;
+            
+            if (timeSince < 300 && timeSince > 0) {
+                // Двойной тап обнаружен
+                if (gameOver) {
+                    gameOver = false;
+                    player.score = 0;
+                    score = 0;
+                    lines = 0;
+                    level = 1;
+                    updateScore();
+                    playerReset();
+                    startButton.textContent = '⏸️ ПАУЗА';
+                } else {
+                    togglePause();
+                }
+                event.preventDefault();
+            }
+            
+            lastTapTime = now;
         }, { passive: false });
         
         canvas.addEventListener('touchmove', function(event) {
@@ -995,30 +1089,57 @@
         });
         
         // Обработчики для мобильных кнопок управления
-        document.getElementById('left-btn').addEventListener('click', () => {
+        // Используем как click, так и touchend события для лучшей совместимости
+        
+        const leftBtn = document.getElementById('left-btn');
+        leftBtn.addEventListener('click', () => {
+            if (!gameOver && !paused) playerMove(-1);
+        });
+        leftBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
             if (!gameOver && !paused) playerMove(-1);
         });
         
-        document.getElementById('right-btn').addEventListener('click', () => {
+        const rightBtn = document.getElementById('right-btn');
+        rightBtn.addEventListener('click', () => {
+            if (!gameOver && !paused) playerMove(1);
+        });
+        rightBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
             if (!gameOver && !paused) playerMove(1);
         });
         
-        document.getElementById('down-btn').addEventListener('click', () => {
+        const downBtn = document.getElementById('down-btn');
+        downBtn.addEventListener('click', () => {
+            if (!gameOver && !paused) playerDrop();
+        });
+        downBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
             if (!gameOver && !paused) playerDrop();
         });
         
-        document.getElementById('rotate-btn').addEventListener('click', () => {
+        const rotateBtn = document.getElementById('rotate-btn');
+        rotateBtn.addEventListener('click', () => {
+            if (!gameOver && !paused) playerRotate(1);
+        });
+        rotateBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
             if (!gameOver && !paused) playerRotate(1);
         });
         
-        document.getElementById('drop-btn').addEventListener('click', () => {
+        const dropBtn = document.getElementById('drop-btn');
+        dropBtn.addEventListener('click', () => {
+            if (!gameOver && !paused) playerHardDrop();
+        });
+        dropBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
             if (!gameOver && !paused) playerHardDrop();
         });
         
         // Предотвращаем прокрутку страницы при нажатии на кнопки
         document.querySelectorAll('.mobile-controls button').forEach(button => {
             button.addEventListener('touchstart', e => e.preventDefault());
-            button.addEventListener('touchend', e => e.preventDefault());
+            button.addEventListener('touchmove', e => e.preventDefault());
         });
         
         // Добавляем блестки на фон
