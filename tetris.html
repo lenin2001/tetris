@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тетрис</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            background: linear-gradient(135deg, #6e45e2, #88d3ce);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 200px;
+        }
+        
+        .score-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        h1 {
+            font-size: 2em;
+            margin: 0 0 20px 0;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+        
+        canvas {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            image-rendering: pixelated;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            border: none;
+            padding: 12px 20px;
+            font-size: 1.2em;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .controls-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .controls-info h3 {
+            margin-top: 0;
+            text-align: center;
+        }
+        
+        .controls-info p {
+            margin: 8px 0;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .sparkle {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: white;
+            border-radius: 50%;
+            animation: sparkle 1s infinite;
+        }
+        
+        @keyframes sparkle {
+            0% { opacity: 0.2; }
+            50% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+        
+        @media (max-width: 768px) {
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .info-panel {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="tetris" width="500" height="1000"></canvas>
+        
+        <div class="info-panel">
+            <h1>✨ Тетрис ✨</h1>
+            
+            <div class="score-box">
+                <p>🏆 Счет: <span id="score">0</span></p>
+                <p>📊 Линии: <span id="lines">0</span></p>
+                <p>🚀 Уровень: <span id="level">1</span></p>
+            </div>
+            
+            <div class="score-box">
+                <p>🎲 Следующая фигура:</p>
+                <canvas id="next" width="120" height="120"></canvas>
+            </div>
+            
+            <button id="start">▶️ СТАРТ</button>
+            
+            <div class="controls-info">
+                <h3>🎮 Управление:</h3>
+                <p>← → : Движение влево/вправо</p>
+                <p>↑ : Вращение</p>
+                <p>↓ : Движение вниз</p>
+                <p>Пробел : Сбросить фигуру</p>
+                <p>P : Пауза</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Получаем элементы
+        const canvas = document.getElementById('tetris');
+        const context = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('next');
+        const nextContext = nextCanvas.getContext('2d');
+        const startButton = document.getElementById('start');
+        
+        // Константы
+        const BLOCK_SIZE = 25; // Размер блока
+        const ROWS = 40;       // Увеличиваем количество рядов в 2 раза (было 20)
+        const COLS = 20;       // Широкий стакан
+        
+        // Настраиваем размер холста для идеальных квадратов
+        canvas.style.width = `${COLS * BLOCK_SIZE}px`;
+        canvas.style.height = `${ROWS * BLOCK_SIZE}px`;
+        
+        // Переменные состояния
+        let dropCounter = 0;
+        let dropInterval = 1000;
+        let lastTime = 0;
+        let score = 0;
+        let lines = 0;
+        let level = 1;
+        let paused = false;
+        let gameOver = true;
+        
+        // Создаем игровое поле
+        const arena = createMatrix(COLS, ROWS);
+        
+        // Игрок
+        const player = {
+            pos: {x: 0, y: 0},
+            matrix: null,
+            next: null,
+            score: 0
+        };
+        
+        // Цвета фигур с градиентами (3D-эффект)
+        const colors = [
+            null,
+            {main: '#FF4136', light: '#FF725C', dark: '#E7040F'}, // Красный
+            {main: '#2ECC40', light: '#9EEBCF', dark: '#137752'}, // Зеленый
+            {main: '#0074D9', light: '#7FDBFF', dark: '#00449E'}, // Синий
+            {main: '#FFDC00', light: '#FFFCEB', dark: '#FFD700'}, // Желтый
+            {main: '#B10DC9', light: '#F6D8FF', dark: '#5E2CA5'}, // Фиолетовый
+            {main: '#FF851B', light: '#FFE8D9', dark: '#D86E00'}, // Оранжевый
+            {main: '#01FF70', light: '#E8FDF5', dark: '#00A86B'},  // Бирюзовый
+            {main: '#F012BE', light: '#FFCEF3', dark: '#85144b'}, // Розовый
+            {main: '#7FDBFF', light: '#E4F9FF', dark: '#0074D9'}, // Голубой
+            {main: '#39CCCC', light: '#E5FFFF', dark: '#2EAD88'}, // Аквамарин
+            {main: '#3D9970', light: '#C4F9EB', dark: '#1A5336'}, // Оливковый
+            {main: '#AAAAAA', light: '#EEEEEE', dark: '#666666'}, // Серый
+            {main: '#FF4136', light: '#FF725C', dark: '#E7040F'}, // Красный (повтор)
+            {main: '#2ECC40', light: '#9EEBCF', dark: '#137752'}  // Зеленый (повтор)
+        ];
+        
+        // Стандартные фигуры Тетриса
+        const standardPieces = [
+            // T-образная фигура
+            [
+                [0, 1, 0],
+                [1, 1, 1]
+            ],
+            // L-образная фигура
+            [
+                [0, 0, 2],
+                [2, 2, 2]
+            ],
+            // J-образная фигура
+            [
+                [3, 0, 0],
+                [3, 3, 3]
+            ],
+            // Квадрат
+            [
+                [4, 4],
+                [4, 4]
+            ],
+            // Z-образная фигура
+            [
+                [5, 5, 0],
+                [0, 5, 5]
+            ],
+            // Перевернутая T-образная фигура
+            [
+                [0, 6, 0],
+                [6, 6, 6]
+            ],
+            // S-образная фигура
+            [
+                [0, 7, 7],
+                [7, 7, 0]
+            ],
+            // I-образная фигура (линия)
+            [
+                [8, 8, 8, 8]
+            ]
+        ];
+        
+        // Дополнительные рандомные фигуры размером от 1 до 4 блоков
+        const additionalPieces = [
+            // Одиночный блок
+            [
+                [9]
+            ],
+            // Двойные блоки (горизонтальные и вертикальные)
+            [
+                [10, 10]
+            ],
+            [
+                [11],
+                [11]
+            ],
+            // Тройные блоки (разные формы)
+            [
+                [12, 12, 12]
+            ],
+            [
+                [13],
+                [13],
+                [13]
+            ],
+            [
+                [14, 14],
+                [14, 0]
+            ],
+            [
+                [15, 15],
+                [0, 15]
+            ]
+        ];
+        
+        // Фигуры из 5 блоков
+        const pentominoePieces = [
+            // I-пентомино (длинная линия)
+            [
+                [1, 1, 1, 1, 1]
+            ],
+            // L-пентомино
+            [
+                [2, 0, 0, 0],
+                [2, 2, 2, 2]
+            ],
+            // J-пентомино
+            [
+                [0, 0, 0, 3],
+                [3, 3, 3, 3]
+            ],
+            // T-пентомино
+            [
+                [0, 4, 0],
+                [0, 4, 0],
+                [4, 4, 4]
+            ],
+            // U-пентомино
+            [
+                [5, 0, 5],
+                [5, 5, 5]
+            ],
+            // X-пентомино (крест)
+            [
+                [0, 6, 0],
+                [6, 6, 6],
+                [0, 6, 0]
+            ],
+            // Z-пентомино
+            [
+                [7, 7, 0],
+                [0, 7, 0],
+                [0, 7, 7]
+            ],
+            // S-пентомино
+            [
+                [0, 8, 8],
+                [0, 8, 0],
+                [8, 8, 0]
+            ],
+            // P-пентомино
+            [
+                [9, 9],
+                [9, 9],
+                [9, 0]
+            ],
+            // F-пентомино
+            [
+                [0, 10, 10],
+                [10, 10, 0],
+                [0, 10, 0]
+            ]
+        ];
+        
+        // Объединяем все фигуры
+        const pieces = [...standardPieces, ...additionalPieces, ...pentominoePieces];
+        
+        // Функции
+        function createMatrix(w, h) {
+            const matrix = [];
+            while (h--) {
+                matrix.push(new Array(w).fill(0));
+            }
+            return matrix;
+        }
+        
+        function createPiece(type) {
+            if (type < 0 || type >= pieces.length) {
+                console.error("Invalid piece type:", type);
+                // Возвращаем квадрат (индекс 3) как запасной вариант
+                return JSON.parse(JSON.stringify(pieces[3]));
+            }
+            // Создаем глубокую копию фигуры
+            return JSON.parse(JSON.stringify(pieces[type]));
+        }
+        
+        function drawMatrix(matrix, offset, ctx) {
+            matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        // Получаем цвета для текущего блока
+                        const colorIndex = value % colors.length;
+                        const colorSet = colors[colorIndex === 0 ? 1 : colorIndex];
+                        
+                        // Рисуем основной блок
+                        ctx.fillStyle = colorSet.main;
+                        ctx.fillRect(
+                            (x + offset.x) * BLOCK_SIZE,
+                            (y + offset.y) * BLOCK_SIZE,
+                            BLOCK_SIZE, BLOCK_SIZE
+                        );
+                        
+                        // Добавляем блеск (светлая часть)
+                        ctx.fillStyle = colorSet.light;
+                        ctx.fillRect(
+                            (x + offset.x) * BLOCK_SIZE,
+                            (y + offset.y) * BLOCK_SIZE,
+                            BLOCK_SIZE, BLOCK_SIZE / 4
+                        );
+                        
+                        // Добавляем тень (темная часть)
+                        ctx.fillStyle = colorSet.dark;
+                        ctx.fillRect(
+                            (x + offset.x) * BLOCK_SIZE,
+                            (y + offset.y) * BLOCK_SIZE + BLOCK_SIZE * 3/4,
+                            BLOCK_SIZE, BLOCK_SIZE / 4
+                        );
+                        
+                        // Рисуем границу блока
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(
+                            (x + offset.x) * BLOCK_SIZE,
+                            (y + offset.y) * BLOCK_SIZE,
+                            BLOCK_SIZE, BLOCK_SIZE
+                        );
+                    }
+                });
+            });
+        }
+        
+        function draw() {
+            // Очищаем холст
+            context.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем сетку
+            context.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            context.lineWidth = 1;
+            
+            for (let x = 0; x <= COLS; x++) {
+                context.beginPath();
+                context.moveTo(x * BLOCK_SIZE, 0);
+                context.lineTo(x * BLOCK_SIZE, ROWS * BLOCK_SIZE);
+                context.stroke();
+            }
+            
+            for (let y = 0; y <= ROWS; y++) {
+                context.beginPath();
+                context.moveTo(0, y * BLOCK_SIZE);
+                context.lineTo(COLS * BLOCK_SIZE, y * BLOCK_SIZE);
+                context.stroke();
+            }
+            
+            // Рисуем арену
+            drawMatrix(arena, {x: 0, y: 0}, context);
+            
+            // Рисуем текущую фигуру
+            if (player.matrix) {
+                drawMatrix(player.matrix, player.pos, context);
+            }
+            
+            // Рисуем следующую фигуру
+            nextContext.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            nextContext.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+            
+            if (player.next) {
+                const offset = {
+                    x: (nextCanvas.width / BLOCK_SIZE - player.next[0].length) / 2,
+                    y: (nextCanvas.height / BLOCK_SIZE - player.next.length) / 2
+                };
+                drawMatrix(player.next, offset, nextContext);
+            }
+            
+            // Отображаем паузу
+            if (paused) {
+                context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                context.font = '30px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2);
+            }
+        }
+        
+        function merge(arena, player) {
+            player.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        arena[y + player.pos.y][x + player.pos.x] = value;
+                    }
+                });
+            });
+        }
+        
+        function collide(arena, player) {
+            const [m, o] = [player.matrix, player.pos];
+            for (let y = 0; y < m.length; ++y) {
+                for (let x = 0; x < m[y].length; ++x) {
+                    if (m[y][x] !== 0 &&
+                        (arena[y + o.y] === undefined ||
+                         arena[y + o.y][x + o.x] === undefined ||
+                         arena[y + o.y][x + o.x] !== 0)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function rotate(matrix, dir) {
+            // Создаем новую матрицу для результата вращения
+            const N = matrix.length;
+            const M = matrix[0].length;
+            let result = [];
+            
+            if (dir > 0) { // По часовой стрелке
+                for (let i = 0; i < M; i++) {
+                    let newRow = [];
+                    for (let j = N - 1; j >= 0; j--) {
+                        newRow.push(matrix[j][i]);
+                    }
+                    result.push(newRow);
+                }
+            } else { // Против часовой стрелки
+                for (let i = M - 1; i >= 0; i--) {
+                    let newRow = [];
+                    for (let j = 0; j < N; j++) {
+                        newRow.push(matrix[j][i]);
+                    }
+                    result.push(newRow);
+                }
+            }
+            
+            // Создаем новую матрицу вместо изменения исходной
+            const rotatedMatrix = [];
+            for (let i = 0; i < result.length; i++) {
+                rotatedMatrix.push([...result[i]]);
+            }
+            
+            // Заменяем содержимое исходной матрицы
+            matrix.length = 0; // Очищаем исходную матрицу
+            for (let i = 0; i < rotatedMatrix.length; i++) {
+                matrix.push(rotatedMatrix[i]);
+            }
+        }
+        
+        function playerRotate(dir) {
+            const originalPos = {
+                x: player.pos.x,
+                y: player.pos.y
+            };
+            
+            // Сохраняем оригинальную матрицу
+            const originalMatrix = JSON.parse(JSON.stringify(player.matrix));
+            
+            // Вращаем матрицу
+            rotate(player.matrix, dir);
+            
+            // Проверяем, не выходит ли фигура за правую границу
+            const rightOverhang = player.pos.x + player.matrix[0].length - COLS;
+            if (rightOverhang > 0) {
+                player.pos.x -= rightOverhang;
+            }
+            
+            // Проверяем, не выходит ли фигура за левую границу
+            if (player.pos.x < 0) {
+                player.pos.x = 0;
+            }
+            
+            // Проверяем, не выходит ли фигура за нижнюю границу
+            const bottomOverhang = player.pos.y + player.matrix.length - ROWS;
+            if (bottomOverhang > 0) {
+                player.pos.y -= bottomOverhang;
+            }
+            
+            // Пытаемся найти позицию, где фигура не будет сталкиваться
+            let offset = 1;
+            let attempts = 0;
+            const maxAttempts = Math.max(player.matrix[0].length, player.matrix.length) * 2;
+            
+            while (collide(arena, player)) {
+                player.pos.x += offset;
+                offset = -(offset + (offset > 0 ? 1 : -1));
+                attempts++;
+                
+                // Если не можем разместить фигуру после вращения по горизонтали,
+                // пробуем сдвинуть вверх
+                if (Math.abs(offset) > player.matrix[0].length) {
+                    player.pos.x = originalPos.x;
+                    player.pos.y--;
+                    offset = 1;
+                }
+                
+                // Если все попытки не удались, возвращаем исходную фигуру
+                if (attempts > maxAttempts) {
+                    player.matrix = originalMatrix;
+                    player.pos.x = originalPos.x;
+                    player.pos.y = originalPos.y;
+                    return;
+                }
+            }
+        }
+        
+        function playerDrop() {
+            player.pos.y++;
+            if (collide(arena, player)) {
+                player.pos.y--;
+                merge(arena, player);
+                playerReset();
+                arenaSweep();
+                updateScore();
+            }
+            dropCounter = 0;
+        }
+        
+        function playerMove(offset) {
+            player.pos.x += offset;
+            if (collide(arena, player)) {
+                player.pos.x -= offset;
+            }
+        }
+        
+        function playerHardDrop() {
+            while (!collide(arena, player)) {
+                player.pos.y++;
+            }
+            player.pos.y--;
+            merge(arena, player);
+            playerReset();
+            arenaSweep();
+            updateScore();
+            dropCounter = 0;
+        }
+        
+        function playerReset() {
+            // Устанавливаем следующую фигуру как текущую
+            if (player.next === null) {
+                player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
+            } else {
+                player.matrix = player.next;
+            }
+            
+            // Создаем новую следующую фигуру
+            player.next = createPiece(Math.floor(Math.random() * pieces.length));
+            
+            // Сбрасываем позицию
+            player.pos.y = 0;
+            player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
+            
+            // Проверка на конец игры
+            if (collide(arena, player)) {
+                // Очищаем арену
+                arena.forEach(row => row.fill(0));
+                
+                // Сбрасываем счет
+                player.score = 0;
+                score = 0;
+                lines = 0;
+                level = 1;
+                updateScore();
+                
+                // Устанавливаем флаг конца игры
+                gameOver = true;
+                paused = false;
+                startButton.textContent = '▶️ СТАРТ';
+            }
+        }
+        
+        function arenaSweep() {
+            let rowCount = 0;
+            let rowsToRemove = [];
+            
+            // Находим заполненные строки
+            for (let y = arena.length - 1; y >= 0; --y) {
+                if (arena[y].every(value => value !== 0)) {
+                    rowsToRemove.push(y);
+                    rowCount++;
+                }
+            }
+            
+            if (rowCount > 0) {
+                // Анимация удаления строк
+                animateRowClear(rowsToRemove, () => {
+                    // Сортируем строки в порядке убывания
+                    rowsToRemove.sort((a, b) => b - a);
+                    
+                    // Удаляем строки
+                    rowsToRemove.forEach(y => {
+                        arena.splice(y, 1);
+                        arena.unshift(new Array(COLS).fill(0));
+                    });
+                    
+                    // Обновляем счет
+                    player.score += rowCount * 10 * level;
+                    lines += rowCount;
+                    level = Math.floor(lines / 10) + 1;
+                    dropInterval = 1000 / level;
+                    
+                    updateScore();
+                });
+            }
+        }
+        
+        function animateRowClear(rows, callback) {
+            const originalRows = rows.map(y => [...arena[y]]);
+            let animationStep = 0;
+            const totalSteps = 10;
+            
+            function animate() {
+                if (animationStep >= totalSteps) {
+                    callback();
+                    return;
+                }
+                
+                // Анимация мигания и движения строк
+                rows.forEach((y, index) => {
+                    // Чередуем движение влево и вправо
+                    const direction = index % 2 === 0 ? 1 : -1;
+                    const offset = Math.sin(animationStep / totalSteps * Math.PI) * 3 * direction;
+                    
+                    // Создаем временную строку для анимации
+                    const tempRow = new Array(COLS).fill(0);
+                    
+                    // Заполняем строку с учетом смещения
+                    for (let x = 0; x < COLS; x++) {
+                        const sourceX = Math.floor(x - offset);
+                        if (sourceX >= 0 && sourceX < COLS) {
+                            tempRow[x] = originalRows[index][sourceX];
+                        }
+                    }
+                    
+                    // Применяем анимированную строку
+                    arena[y] = tempRow;
+                });
+                
+                // Отрисовываем текущий кадр
+                draw();
+                
+                // Переходим к следующему шагу анимации
+                animationStep++;
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        function updateScore() {
+            document.getElementById('score').textContent = player.score;
+            document.getElementById('lines').textContent = lines;
+            document.getElementById('level').textContent = level;
+        }
+        
+        function togglePause() {
+            paused = !paused;
+            if (paused) {
+                startButton.textContent = '▶️ ПРОДОЛЖИТЬ';
+            } else {
+                startButton.textContent = '⏸️ ПАУЗА';
+            }
+        }
+        
+        function update(time = 0) {
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            
+            if (!gameOver && !paused) {
+                dropCounter += deltaTime;
+                if (dropCounter > dropInterval) {
+                    playerDrop();
+                }
+            }
+            
+            draw();
+            requestAnimationFrame(update);
+        }
+        
+        // Инициализация игры
+        function initGame() {
+            // Создаем первую фигуру и следующую фигуру
+            player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
+            player.next = createPiece(Math.floor(Math.random() * pieces.length));
+            
+            // Устанавливаем начальную позицию
+            player.pos.y = 0;
+            player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
+            
+            // Обновляем счет
+            updateScore();
+            
+            // Отрисовываем начальное состояние
+            draw();
+        }
+        
+        // Обработчики событий
+        document.addEventListener('keydown', event => {
+            if (gameOver) return;
+            
+            switch (event.keyCode) {
+                case 37: // Стрелка влево
+                    playerMove(-1);
+                    break;
+                case 39: // Стрелка вправо
+                    playerMove(1);
+                    break;
+                case 40: // Стрелка вниз
+                    playerDrop();
+                    break;
+                case 38: // Стрелка вверх
+                    playerRotate(1);
+                    break;
+                case 32: // Пробел
+                    event.preventDefault();
+                    playerHardDrop();
+                    break;
+                case 80: // Клавиша 'P'
+                    togglePause();
+                    break;
+            }
+        });
+        
+        startButton.addEventListener('click', () => {
+            if (gameOver) {
+                gameOver = false;
+                player.score = 0;
+                score = 0;
+                lines = 0;
+                level = 1;
+                updateScore();
+                playerReset();
+                startButton.textContent = '⏸️ ПАУЗА';
+            } else {
+                togglePause();
+            }
+        });
+        
+        // Добавляем блестки на фон
+        function createSparkles() {
+            const container = document.querySelector('.game-container');
+            for (let i = 0; i < 30; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.classList.add('sparkle');
+                sparkle.style.left = `${Math.random() * 100}%`;
+                sparkle.style.top = `${Math.random() * 100}%`;
+                sparkle.style.animationDelay = `${Math.random() * 2}s`;
+                container.appendChild(sparkle);
+            }
+        }
+        
+        // Настройка размера холста для следующей фигуры
+        nextCanvas.style.width = `${120}px`;
+        nextCanvas.style.height = `${120}px`;
+        
+        // Запуск игры
+        initGame();
+        update();
+        createSparkles();
+    </script>
+</body>
+</html>
