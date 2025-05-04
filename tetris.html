@@ -142,9 +142,9 @@
                 max-width: 100%;
                 height: auto !important; /* Принудительно устанавливаем автоматическую высоту */
                 order: 1;
-                transform: scale(0.9); /* Немного уменьшаем размер для лучшей видимости */
+                transform: scale(0.65); /* Значительно уменьшаем размер для лучшей видимости */
                 transform-origin: top center;
-                margin-bottom: 20px; /* Добавляем отступ снизу */
+                margin-bottom: 40px; /* Увеличиваем отступ снизу */
             }
             
             h1 {
@@ -164,8 +164,36 @@
             /* Уменьшаем размер игрового поля для мобильных устройств */
             @media (max-height: 800px) {
                 canvas#tetris {
-                    transform: scale(0.7);
+                    transform: scale(0.5); /* Еще сильнее уменьшаем для низких экранов */
                     margin-bottom: 0;
+                }
+                
+                .game-container {
+                    margin-bottom: 60px; /* Увеличиваем отступ снизу */
+                }
+                
+                body {
+                    padding-bottom: 80px; /* Добавляем отступ снизу для всей страницы */
+                }
+            }
+            
+            /* Дополнительные стили для очень маленьких экранов */
+            @media (max-height: 600px) {
+                canvas#tetris {
+                    transform: scale(0.4); /* Максимальное уменьшение для очень маленьких экранов */
+                }
+                
+                .mobile-controls {
+                    margin-top: 5px; /* Уменьшаем отступ сверху для кнопок */
+                }
+                
+                .mobile-controls button {
+                    width: 60px;
+                    height: 60px;
+                }
+                
+                #rotate-btn, #drop-btn {
+                    width: 120px;
                 }
             }
         }
@@ -174,6 +202,38 @@
         html, body {
             overscroll-behavior: contain;
             touch-action: pan-y; /* Разрешаем вертикальную прокрутку */
+            scroll-behavior: smooth; /* Плавная прокрутка */
+        }
+        
+        /* Дополнительные стили для улучшения видимости на мобильных */
+        @media (max-width: 768px) {
+            .game-wrapper {
+                position: relative;
+                width: 100%;
+                overflow: visible;
+            }
+            
+            /* Добавляем индикатор прокрутки для мобильных устройств */
+            .scroll-indicator {
+                display: block;
+                position: fixed;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 20px;
+                font-size: 12px;
+                z-index: 1000;
+                animation: pulse 2s infinite;
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 0.5; }
+                50% { opacity: 1; }
+                100% { opacity: 0.5; }
+            }
         }
         
         /* Стили для мобильных кнопок управления */
@@ -259,7 +319,10 @@
 </head>
 <body>
     <div class="game-container">
-        <canvas id="tetris" width="500" height="1000"></canvas>
+        <div class="game-wrapper">
+            <canvas id="tetris" width="500" height="1000"></canvas>
+            <div class="scroll-indicator" id="scroll-indicator">Прокрутите вниз для полного обзора</div>
+        </div>
         
         <!-- Мобильные кнопки управления -->
         <div class="mobile-controls">
@@ -1094,10 +1157,14 @@
                 if (Math.abs(deltaX) > Math.abs(deltaY)) {
                     // Горизонтальный свайп
                     if (deltaX > 0) {
-                        // Свайп вправо
+                        // Свайп вправо - перемещаем на 3 клетки
+                        playerMove(1);
+                        playerMove(1);
                         playerMove(1);
                     } else {
-                        // Свайп влево
+                        // Свайп влево - перемещаем на 3 клетки
+                        playerMove(-1);
+                        playerMove(-1);
                         playerMove(-1);
                     }
                 } else {
@@ -1227,6 +1294,27 @@
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             // Небольшая задержка для загрузки всех ресурсов
             setTimeout(startGame, 1000);
+            
+            // Скрываем индикатор прокрутки после прокрутки
+            const scrollIndicator = document.getElementById('scroll-indicator');
+            if (scrollIndicator) {
+                window.addEventListener('scroll', function() {
+                    if (window.scrollY > 50) {
+                        scrollIndicator.style.opacity = '0';
+                        setTimeout(() => {
+                            scrollIndicator.style.display = 'none';
+                        }, 500);
+                    }
+                });
+                
+                // Скрываем индикатор через 5 секунд в любом случае
+                setTimeout(() => {
+                    scrollIndicator.style.opacity = '0';
+                    setTimeout(() => {
+                        scrollIndicator.style.display = 'none';
+                    }, 500);
+                }, 5000);
+            }
         }
     </script>
 </body>
