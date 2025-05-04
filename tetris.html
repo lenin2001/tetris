@@ -3,6 +3,7 @@
 <head>
     <title>Тетрис</title>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body {
             background: linear-gradient(135deg, #6e45e2, #88d3ce);
@@ -115,14 +116,99 @@
         }
         
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                height: auto;
+                min-height: 100vh;
+            }
+            
             .game-container {
                 flex-direction: column;
                 align-items: center;
+                padding: 10px;
+                max-width: 100%;
+                box-sizing: border-box;
             }
             
             .info-panel {
                 width: 100%;
                 max-width: 300px;
+                order: 2;
+            }
+            
+            canvas#tetris {
+                max-width: 100%;
+                height: auto;
+                order: 1;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+            
+            .controls-info {
+                font-size: 0.9em;
+            }
+            
+            button {
+                padding: 10px;
+                font-size: 1em;
+            }
+        }
+        
+        /* Предотвращаем прокрутку страницы при свайпах на мобильных устройствах */
+        html, body {
+            overscroll-behavior: contain;
+            touch-action: none;
+        }
+        
+        /* Стили для мобильных кнопок управления */
+        .mobile-controls {
+            display: none; /* По умолчанию скрыты */
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .mobile-controls-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .mobile-controls button {
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .mobile-controls button:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        #rotate-btn, #drop-btn {
+            width: 120px;
+            border-radius: 30px;
+        }
+        
+        /* Показываем мобильные кнопки только на мобильных устройствах */
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: flex;
+                order: 3;
             }
         }
     </style>
@@ -130,6 +216,21 @@
 <body>
     <div class="game-container">
         <canvas id="tetris" width="500" height="1000"></canvas>
+        
+        <!-- Мобильные кнопки управления -->
+        <div class="mobile-controls">
+            <div class="mobile-controls-row">
+                <button id="rotate-btn">↑</button>
+            </div>
+            <div class="mobile-controls-row">
+                <button id="left-btn">←</button>
+                <button id="down-btn">↓</button>
+                <button id="right-btn">→</button>
+            </div>
+            <div class="mobile-controls-row">
+                <button id="drop-btn">⬇️⬇️</button>
+            </div>
+        </div>
         
         <div class="info-panel">
             <h1>✨ Тетрис ✨</h1>
@@ -154,6 +255,12 @@
                 <p>↓ : Движение вниз</p>
                 <p>Пробел : Сбросить фигуру</p>
                 <p>P : Пауза</p>
+                <h3>📱 Мобильное управление:</h3>
+                <p>Свайп влево/вправо: Движение</p>
+                <p>Свайп вверх: Вращение</p>
+                <p>Свайп вниз: Сбросить фигуру</p>
+                <p>Тап: Движение вниз</p>
+                <p>Также доступны кнопки управления</p>
             </div>
         </div>
     </div>
@@ -782,6 +889,7 @@
         }
         
         // Обработчики событий
+        // Обработчик клавиатуры
         document.addEventListener('keydown', event => {
             if (gameOver) return;
             
@@ -808,6 +916,69 @@
             }
         });
         
+        // Переменные для обработки свайпов
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        
+        // Минимальное расстояние для определения свайпа
+        const minSwipeDistance = 30;
+        
+        // Обработчики сенсорных событий для свайпов
+        canvas.addEventListener('touchstart', function(event) {
+            event.preventDefault(); // Предотвращаем стандартное поведение браузера
+            touchStartX = event.changedTouches[0].screenX;
+            touchStartY = event.changedTouches[0].screenY;
+        }, { passive: false });
+        
+        canvas.addEventListener('touchmove', function(event) {
+            event.preventDefault(); // Предотвращаем прокрутку страницы
+        }, { passive: false });
+        
+        canvas.addEventListener('touchend', function(event) {
+            event.preventDefault(); // Предотвращаем стандартное поведение браузера
+            if (gameOver || paused) return;
+            
+            touchEndX = event.changedTouches[0].screenX;
+            touchEndY = event.changedTouches[0].screenY;
+            
+            handleSwipe();
+        }, { passive: false });
+        
+        // Функция обработки свайпа
+        function handleSwipe() {
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            // Определяем, был ли свайп достаточно длинным
+            if (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance) {
+                // Определяем направление свайпа
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Горизонтальный свайп
+                    if (deltaX > 0) {
+                        // Свайп вправо
+                        playerMove(1);
+                    } else {
+                        // Свайп влево
+                        playerMove(-1);
+                    }
+                } else {
+                    // Вертикальный свайп
+                    if (deltaY > 0) {
+                        // Свайп вниз
+                        playerHardDrop(); // Быстрое падение при свайпе вниз
+                    } else {
+                        // Свайп вверх
+                        playerRotate(1); // Вращение при свайпе вверх
+                    }
+                }
+            } else {
+                // Короткое нажатие (тап) - мягкое падение
+                playerDrop();
+            }
+        }
+        
         startButton.addEventListener('click', () => {
             if (gameOver) {
                 gameOver = false;
@@ -821,6 +992,33 @@
             } else {
                 togglePause();
             }
+        });
+        
+        // Обработчики для мобильных кнопок управления
+        document.getElementById('left-btn').addEventListener('click', () => {
+            if (!gameOver && !paused) playerMove(-1);
+        });
+        
+        document.getElementById('right-btn').addEventListener('click', () => {
+            if (!gameOver && !paused) playerMove(1);
+        });
+        
+        document.getElementById('down-btn').addEventListener('click', () => {
+            if (!gameOver && !paused) playerDrop();
+        });
+        
+        document.getElementById('rotate-btn').addEventListener('click', () => {
+            if (!gameOver && !paused) playerRotate(1);
+        });
+        
+        document.getElementById('drop-btn').addEventListener('click', () => {
+            if (!gameOver && !paused) playerHardDrop();
+        });
+        
+        // Предотвращаем прокрутку страницы при нажатии на кнопки
+        document.querySelectorAll('.mobile-controls button').forEach(button => {
+            button.addEventListener('touchstart', e => e.preventDefault());
+            button.addEventListener('touchend', e => e.preventDefault());
         });
         
         // Добавляем блестки на фон
