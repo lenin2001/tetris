@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Скачать Tetris</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .download-btn {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 16px;
+            margin: 20px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .instructions {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background-color: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+        }
+        pre {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tetris - Классическая игра</h1>
+    
+    <p>Это классическая игра Tetris, написанная на HTML, CSS и JavaScript.</p>
+    
+    <a href="/tmp/tetris.tar.gz" class="download-btn" download>Скачать проект</a>
+    
+    <div class="instructions">
+        <h2>Инструкции по загрузке на GitHub:</h2>
+        <ol>
+            <li>Скачайте архив проекта, нажав на кнопку выше</li>
+            <li>Распакуйте архив в удобное место на вашем компьютере</li>
+            <li>Создайте новый репозиторий на GitHub с именем "tetris"</li>
+            <li>Загрузите файлы в репозиторий, используя следующие команды:</li>
+        </ol>
+        
+        <pre><code>cd путь/к/распакованному/архиву
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/lenin2001/tetris.git
+git push -u origin main</code></pre>
+        
+        <h2>Настройка GitHub Pages:</h2>
+        <ol>
+            <li>Перейдите в настройки вашего репозитория на GitHub (Settings)</li>
+            <li>Прокрутите вниз до раздела "GitHub Pages"</li>
+            <li>В разделе "Source" выберите ветку "main" и папку "/ (root)"</li>
+            <li>Нажмите "Save"</li>
+            <li>Через несколько минут ваша игра будет доступна по адресу:<br>
+                <code>https://lenin2001.github.io/tetris/</code></li>
+        </ol>
+    </div>
+    
+    <p>Если у вас возникли вопросы или проблемы, обратитесь к документации GitHub или создайте issue в репозитории.</p>
+</body>
+</html>

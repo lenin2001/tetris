@@ -41,7 +41,7 @@ http://localhost:8000/
 ### Онлайн версия
 
 Игра также доступна онлайн по адресу:
-https://[ваше-имя-пользователя].github.io/tetris/
+https://lenin2001.github.io/tetris/
 
 ## Технологии
 
