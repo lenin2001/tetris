@@ -215,7 +215,7 @@
             
             /* Добавляем индикатор прокрутки для мобильных устройств */
             .scroll-indicator {
-                display: block;
+                display: none; /* По умолчанию скрыт */
                 position: fixed;
                 bottom: 10px;
                 left: 50%;
@@ -227,6 +227,14 @@
                 font-size: 12px;
                 z-index: 1000;
                 animation: pulse 2s infinite;
+                transition: opacity 0.5s;
+            }
+            
+            /* Показываем индикатор только на мобильных устройствах */
+            @media (max-width: 768px) {
+                .scroll-indicator {
+                    display: block;
+                }
             }
             
             @keyframes pulse {
@@ -829,67 +837,111 @@
         }
         
         function playerDrop() {
-            player.pos.y++;
-            if (collide(arena, player)) {
-                player.pos.y--;
-                merge(arena, player);
-                playerReset();
-                arenaSweep();
-                updateScore();
+            try {
+                player.pos.y++;
+                if (collide(arena, player)) {
+                    player.pos.y--;
+                    merge(arena, player);
+                    const gameEnded = playerReset();
+                    if (!gameEnded) {
+                        arenaSweep();
+                        updateScore();
+                    }
+                }
+                dropCounter = 0;
+            } catch (e) {
+                console.error("Ошибка в playerDrop:", e);
+                dropCounter = 0;
             }
-            dropCounter = 0;
         }
         
         function playerMove(offset) {
-            player.pos.x += offset;
-            if (collide(arena, player)) {
-                player.pos.x -= offset;
+            try {
+                // Проверяем, что смещение не выходит за пределы разумного
+                if (offset > 10 || offset < -10) {
+                    console.warn("Слишком большое смещение:", offset);
+                    offset = Math.sign(offset); // Ограничиваем до 1 или -1
+                }
+                
+                player.pos.x += offset;
+                if (collide(arena, player)) {
+                    player.pos.x -= offset;
+                }
+            } catch (e) {
+                console.error("Ошибка в playerMove:", e);
             }
         }
         
         function playerHardDrop() {
-            while (!collide(arena, player)) {
-                player.pos.y++;
+            try {
+                let dropDistance = 0;
+                while (!collide(arena, player)) {
+                    player.pos.y++;
+                    dropDistance++;
+                    // Ограничиваем максимальное расстояние падения для безопасности
+                    if (dropDistance > 100) break;
+                }
+                player.pos.y--;
+                merge(arena, player);
+                const gameEnded = playerReset();
+                if (!gameEnded) {
+                    arenaSweep();
+                    updateScore();
+                }
+                dropCounter = 0;
+            } catch (e) {
+                console.error("Ошибка в playerHardDrop:", e);
+                dropCounter = 0;
             }
-            player.pos.y--;
-            merge(arena, player);
-            playerReset();
-            arenaSweep();
-            updateScore();
-            dropCounter = 0;
         }
         
         function playerReset() {
-            // Устанавливаем следующую фигуру как текущую
-            if (player.next === null) {
-                player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
-            } else {
-                player.matrix = player.next;
-            }
-            
-            // Создаем новую следующую фигуру
-            player.next = createPiece(Math.floor(Math.random() * pieces.length));
-            
-            // Сбрасываем позицию
-            player.pos.y = 0;
-            player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
-            
-            // Проверка на конец игры
-            if (collide(arena, player)) {
-                // Очищаем арену
-                arena.forEach(row => row.fill(0));
+            try {
+                // Устанавливаем следующую фигуру как текущую
+                if (player.next === null) {
+                    player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
+                } else {
+                    player.matrix = player.next;
+                }
                 
-                // Сбрасываем счет
-                player.score = 0;
-                score = 0;
-                lines = 0;
-                level = 1;
-                updateScore();
+                // Создаем новую следующую фигуру
+                player.next = createPiece(Math.floor(Math.random() * pieces.length));
                 
-                // Устанавливаем флаг конца игры
+                // Сбрасываем позицию
+                player.pos.y = 0;
+                player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
+                
+                // Проверка на конец игры
+                if (collide(arena, player)) {
+                    console.log("Обнаружено столкновение при сбросе игрока - игра окончена");
+                    
+                    // Устанавливаем флаг конца игры
+                    gameOver = true;
+                    paused = false;
+                    startButton.textContent = '▶️ СТАРТ';
+                    
+                    // Отображаем сообщение о конце игры
+                    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    context.font = '30px Arial';
+                    context.fillStyle = 'white';
+                    context.textAlign = 'center';
+                    context.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - 30);
+                    context.fillText('Нажмите СТАРТ для новой игры', canvas.width / 2, canvas.height / 2 + 30);
+                    
+                    // Обновляем счет на экране
+                    updateScore();
+                    
+                    return true; // Возвращаем true, если игра окончена
+                }
+                
+                return false; // Возвращаем false, если игра продолжается
+            } catch (e) {
+                console.error("Ошибка при сбросе игрока:", e);
                 gameOver = true;
-                paused = false;
                 startButton.textContent = '▶️ СТАРТ';
+                return true;
             }
         }
         
@@ -899,7 +951,8 @@
             
             // Находим заполненные строки
             for (let y = arena.length - 1; y >= 0; --y) {
-                if (arena[y].every(value => value !== 0)) {
+                // Проверяем, что строка существует и полностью заполнена
+                if (arena[y] && arena[y].every(value => value !== 0)) {
                     rowsToRemove.push(y);
                     rowCount++;
                 }
@@ -908,67 +961,45 @@
             if (rowCount > 0) {
                 // Анимация удаления строк
                 animateRowClear(rowsToRemove, () => {
-                    // Сортируем строки в порядке убывания
-                    rowsToRemove.sort((a, b) => b - a);
-                    
-                    // Удаляем строки
-                    rowsToRemove.forEach(y => {
-                        arena.splice(y, 1);
-                        arena.unshift(new Array(COLS).fill(0));
-                    });
-                    
-                    // Обновляем счет
-                    player.score += rowCount * 10 * level;
-                    lines += rowCount;
-                    level = Math.floor(lines / 10) + 1;
-                    dropInterval = 1000 / level;
-                    
-                    updateScore();
+                    try {
+                        // Сортируем строки в порядке убывания
+                        rowsToRemove.sort((a, b) => b - a);
+                        
+                        // Удаляем строки
+                        rowsToRemove.forEach(y => {
+                            // Проверяем, что индекс строки корректный
+                            if (y >= 0 && y < arena.length) {
+                                arena.splice(y, 1);
+                                arena.unshift(new Array(COLS).fill(0));
+                            }
+                        });
+                        
+                        // Обновляем счет
+                        player.score += rowCount * 10 * level;
+                        lines += rowCount;
+                        level = Math.floor(lines / 10) + 1;
+                        dropInterval = 1000 / level;
+                        
+                        updateScore();
+                    } catch (e) {
+                        console.error("Ошибка при удалении строк:", e);
+                    }
                 });
             }
         }
         
         function animateRowClear(rows, callback) {
-            const originalRows = rows.map(y => [...arena[y]]);
-            let animationStep = 0;
-            const totalSteps = 10;
+            // Создаем копию строк для анимации
+            const rowsCopy = [...rows];
             
-            function animate() {
-                if (animationStep >= totalSteps) {
-                    callback();
-                    return;
-                }
+            // Сразу вызываем callback для удаления строк
+            // Это предотвращает проблемы с анимацией
+            setTimeout(() => {
+                callback();
                 
-                // Анимация мигания и движения строк
-                rows.forEach((y, index) => {
-                    // Чередуем движение влево и вправо
-                    const direction = index % 2 === 0 ? 1 : -1;
-                    const offset = Math.sin(animationStep / totalSteps * Math.PI) * 3 * direction;
-                    
-                    // Создаем временную строку для анимации
-                    const tempRow = new Array(COLS).fill(0);
-                    
-                    // Заполняем строку с учетом смещения
-                    for (let x = 0; x < COLS; x++) {
-                        const sourceX = Math.floor(x - offset);
-                        if (sourceX >= 0 && sourceX < COLS) {
-                            tempRow[x] = originalRows[index][sourceX];
-                        }
-                    }
-                    
-                    // Применяем анимированную строку
-                    arena[y] = tempRow;
-                });
-                
-                // Отрисовываем текущий кадр
+                // Отрисовываем обновленное состояние
                 draw();
-                
-                // Переходим к следующему шагу анимации
-                animationStep++;
-                requestAnimationFrame(animate);
-            }
-            
-            animate();
+            }, 100);
         }
         
         function updateScore() {
@@ -978,57 +1009,259 @@
         }
         
         function togglePause() {
-            paused = !paused;
-            if (paused) {
-                startButton.textContent = '▶️ ПРОДОЛЖИТЬ';
-            } else {
-                startButton.textContent = '⏸️ ПАУЗА';
+            console.log("Переключение паузы, текущее состояние: gameOver=" + gameOver + ", paused=" + paused);
+            
+            try {
+                // Проверяем, что игра не окончена
+                if (gameOver) {
+                    console.log("Игра окончена или не запущена, нельзя поставить на паузу");
+                    return false;
+                }
+                
+                paused = !paused;
+                
+                if (paused) {
+                    console.log("Игра на паузе");
+                    startButton.textContent = '▶️ ПРОДОЛЖИТЬ';
+                    
+                    // Отображаем сообщение о паузе
+                    context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    context.font = '30px Arial';
+                    context.fillStyle = 'white';
+                    context.textAlign = 'center';
+                    context.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2);
+                } else {
+                    console.log("Игра продолжается");
+                    startButton.textContent = '⏸️ ПАУЗА';
+                    
+                    // Перерисовываем игру
+                    draw();
+                    
+                    // Если анимация не запущена, запускаем ее
+                    if (animationId === null) {
+                        console.log("Перезапуск анимации");
+                        lastTime = 0;
+                        animationId = requestAnimationFrame(update);
+                    }
+                }
+                
+                return true;
+            } catch (e) {
+                console.error("Ошибка при переключении паузы:", e);
+                return false;
             }
         }
+        
+        let animationId = null;
         
         function update(time = 0) {
-            const deltaTime = time - lastTime;
-            lastTime = time;
-            
-            if (!gameOver && !paused) {
-                dropCounter += deltaTime;
-                if (dropCounter > dropInterval) {
-                    playerDrop();
+            try {
+                // Сохраняем текущий animationId для проверки
+                const currentAnimationId = animationId;
+                console.log("Обновление кадра, animationId =", animationId, "gameOver =", gameOver, "paused =", paused);
+                
+                // Рассчитываем дельту времени
+                const deltaTime = time - lastTime;
+                lastTime = time;
+                
+                // Обновляем игровую логику только если игра активна
+                if (!gameOver && !paused) {
+                    dropCounter += deltaTime;
+                    if (dropCounter > dropInterval) {
+                        playerDrop();
+                    }
                 }
+                
+                // Отрисовываем текущее состояние игры
+                draw();
+                
+                // Если игра окончена, отображаем сообщение о конце игры или начальный экран
+                if (gameOver) {
+                    // Отображаем сообщение о начале игры или конце игры
+                    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    context.font = '30px Arial';
+                    context.fillStyle = 'white';
+                    context.textAlign = 'center';
+                    
+                    if (score > 0) {
+                        // Конец игры
+                        context.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - 30);
+                        context.fillText('Счет: ' + score, canvas.width / 2, canvas.height / 2);
+                        context.fillText('Нажмите СТАРТ для новой игры', canvas.width / 2, canvas.height / 2 + 30);
+                    } else {
+                        // Начальный экран
+                        context.fillText('ТЕТРИС', canvas.width / 2, canvas.height / 2 - 30);
+                        context.fillText('Нажмите СТАРТ для начала игры', canvas.width / 2, canvas.height / 2 + 30);
+                    }
+                }
+                
+                // Запрашиваем следующий кадр анимации только если текущий animationId не изменился
+                // Это предотвращает создание множества циклов анимации
+                if (currentAnimationId === animationId) {
+                    animationId = requestAnimationFrame(update);
+                }
+            } catch (e) {
+                console.error("Ошибка в игровом цикле:", e);
+                
+                // Останавливаем текущий игровой цикл
+                if (animationId !== null) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                // Устанавливаем состояние игры
+                gameOver = true;
+                paused = false;
+                startButton.textContent = '▶️ СТАРТ';
+                
+                // Отображаем сообщение об ошибке
+                try {
+                    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.font = '20px Arial';
+                    context.fillStyle = 'white';
+                    context.textAlign = 'center';
+                    context.fillText('ПРОИЗОШЛА ОШИБКА', canvas.width / 2, canvas.height / 2 - 30);
+                    context.fillText('Нажмите СТАРТ для новой игры', canvas.width / 2, canvas.height / 2 + 30);
+                } catch (drawError) {
+                    console.error("Ошибка при отображении сообщения об ошибке:", drawError);
+                }
+                
+                // Запускаем новый игровой цикл только для отображения сообщения
+                animationId = requestAnimationFrame(update);
+                console.log("Запущен новый игровой цикл после ошибки, animationId =", animationId);
             }
-            
-            draw();
-            requestAnimationFrame(update);
         }
         
-        // Инициализация игры
+        // Инициализация игры - подготовка начального состояния
         function initGame() {
-            // Создаем первую фигуру и следующую фигуру
-            player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
-            player.next = createPiece(Math.floor(Math.random() * pieces.length));
+            console.log("Инициализация игры...");
             
-            // Устанавливаем начальную позицию
-            player.pos.y = 0;
-            player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
-            
-            // Обновляем счет
-            updateScore();
-            
-            // Отрисовываем начальное состояние
-            draw();
-        }
-        
-        // Функция для автоматического запуска игры
-        function startGame() {
-            if (gameOver) {
-                gameOver = false;
+            try {
+                // Останавливаем предыдущий игровой цикл, если он был запущен
+                if (animationId !== null) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                // Очищаем арену
+                arena.forEach(row => row.fill(0));
+                
+                // Сбрасываем счет
                 player.score = 0;
                 score = 0;
                 lines = 0;
                 level = 1;
+                
+                // Создаем первую фигуру и следующую фигуру
+                player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
+                player.next = createPiece(Math.floor(Math.random() * pieces.length));
+                
+                // Устанавливаем начальную позицию
+                player.pos.y = 0;
+                player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
+                
+                // Обновляем счет
                 updateScore();
-                playerReset();
-                startButton.textContent = '⏸️ ПАУЗА';
+                
+                // Устанавливаем начальное состояние игры
+                gameOver = true; // Игра не запущена, ждем нажатия СТАРТ
+                paused = false;
+                
+                // Обновляем текст кнопки
+                startButton.textContent = '▶️ СТАРТ';
+                
+                // Отрисовываем начальное состояние
+                draw();
+                
+                // Отображаем сообщение о начале игры
+                context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                context.font = '30px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.fillText('ТЕТРИС', canvas.width / 2, canvas.height / 2 - 30);
+                context.fillText('Нажмите СТАРТ для начала игры', canvas.width / 2, canvas.height / 2 + 30);
+                
+                // Запускаем игровой цикл только для отображения начального экрана
+                lastTime = 0;
+                
+                // Запускаем игровой цикл только если он еще не запущен
+                if (animationId === null) {
+                    animationId = requestAnimationFrame(update);
+                    console.log("Запущен игровой цикл с animationId =", animationId);
+                }
+                
+                console.log("Игра инициализирована, ожидание запуска");
+                return true;
+            } catch (e) {
+                console.error("Ошибка при инициализации игры:", e);
+                return false;
+            }
+        }
+        
+        // Функция для запуска игры
+        function startGame() {
+            console.log("Запуск игры, текущее состояние: gameOver=" + gameOver + ", paused=" + paused);
+            
+            try {
+                if (gameOver) {
+                    console.log("Запуск новой игры...");
+                    
+                    // Очищаем арену
+                    arena.forEach(row => row.fill(0));
+                    
+                    // Сбрасываем счет
+                    player.score = 0;
+                    score = 0;
+                    lines = 0;
+                    level = 1;
+                    updateScore();
+                    
+                    // Создаем первую фигуру и следующую фигуру
+                    player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
+                    player.next = createPiece(Math.floor(Math.random() * pieces.length));
+                    
+                    // Устанавливаем начальную позицию
+                    player.pos.y = 0;
+                    player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
+                    
+                    // Сбрасываем флаги
+                    gameOver = false;
+                    paused = false;
+                    
+                    // Обновляем текст кнопки
+                    startButton.textContent = '⏸️ ПАУЗА';
+                    
+                    // Сбрасываем счетчики
+                    lastTime = 0;
+                    dropCounter = 0;
+                    
+                    // Отрисовываем игру
+                    draw();
+                    
+                    console.log("Игра запущена, animationId =", animationId);
+                } else if (paused) {
+                    // Снимаем с паузы
+                    paused = false;
+                    startButton.textContent = '⏸️ ПАУЗА';
+                    
+                    // Перерисовываем игру
+                    draw();
+                    
+                    console.log("Игра снята с паузы");
+                }
+                
+                console.log("После запуска: gameOver=" + gameOver + ", paused=" + paused + ", animationId=" + animationId);
+                return true;
+            } catch (e) {
+                console.error("Ошибка при запуске игры:", e);
+                return false;
             }
         }
         
@@ -1072,16 +1305,14 @@
         
         // Обработчик двойного клика для запуска игры
         canvas.addEventListener('dblclick', function(event) {
+            console.log("Двойной клик обнаружен, gameOver =", gameOver);
+            event.preventDefault();
+            
             if (gameOver) {
-                gameOver = false;
-                player.score = 0;
-                score = 0;
-                lines = 0;
-                level = 1;
-                updateScore();
-                playerReset();
-                startButton.textContent = '⏸️ ПАУЗА';
+                console.log("Запуск игры по двойному клику");
+                startGame();
             } else {
+                console.log("Переключение паузы по двойному клику");
                 togglePause();
             }
         });
@@ -1098,16 +1329,13 @@
             
             if (timeSince < 300 && timeSince > 0) {
                 // Двойной тап обнаружен
+                console.log("Двойной тап обнаружен, gameOver =", gameOver);
+                
                 if (gameOver) {
-                    gameOver = false;
-                    player.score = 0;
-                    score = 0;
-                    lines = 0;
-                    level = 1;
-                    updateScore();
-                    playerReset();
-                    startButton.textContent = '⏸️ ПАУЗА';
+                    console.log("Запуск игры по двойному тапу");
+                    startGame();
                 } else {
+                    console.log("Переключение паузы по двойному тапу");
                     togglePause();
                 }
                 event.preventDefault();
@@ -1148,52 +1376,60 @@
         
         // Функция обработки свайпа
         function handleSwipe() {
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
-            
-            // Определяем, был ли свайп достаточно длинным
-            if (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance) {
-                // Определяем направление свайпа
-                if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                    // Горизонтальный свайп
-                    if (deltaX > 0) {
-                        // Свайп вправо - перемещаем на 3 клетки
-                        playerMove(1);
-                        playerMove(1);
-                        playerMove(1);
+            try {
+                // Проверяем, что игра активна
+                if (gameOver || paused) return;
+                
+                // Проверяем, что переменные определены
+                if (typeof touchEndX === 'undefined' || typeof touchStartX === 'undefined' ||
+                    typeof touchEndY === 'undefined' || typeof touchStartY === 'undefined') {
+                    console.warn("Координаты свайпа не определены");
+                    return;
+                }
+                
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+                
+                console.log(`Свайп: deltaX=${deltaX}, deltaY=${deltaY}`);
+                
+                // Определяем, был ли свайп достаточно длинным
+                if (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance) {
+                    // Определяем направление свайпа
+                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                        // Горизонтальный свайп
+                        if (deltaX > 0) {
+                            // Свайп вправо - перемещаем на 1 клетку за раз
+                            playerMove(1);
+                        } else {
+                            // Свайп влево - перемещаем на 1 клетку за раз
+                            playerMove(-1);
+                        }
                     } else {
-                        // Свайп влево - перемещаем на 3 клетки
-                        playerMove(-1);
-                        playerMove(-1);
-                        playerMove(-1);
-                    }
-                } else {
-                    // Вертикальный свайп
-                    if (deltaY > 0) {
-                        // Свайп вниз
-                        playerHardDrop(); // Быстрое падение при свайпе вниз
-                    } else {
-                        // Свайп вверх
-                        playerRotate(1); // Вращение при свайпе вверх
+                        // Вертикальный свайп
+                        if (deltaY > 0) {
+                            // Свайп вниз - мягкое падение
+                            playerDrop();
+                        } else {
+                            // Свайп вверх - вращение
+                            playerRotate(1);
+                        }
                     }
                 }
-            } else {
-                // Короткое нажатие (тап) - мягкое падение
-                playerDrop();
+            } catch (e) {
+                console.error("Ошибка при обработке свайпа:", e);
             }
         }
         
-        startButton.addEventListener('click', () => {
+        // Обработчик для кнопки СТАРТ/ПАУЗА
+        startButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("Кнопка СТАРТ/ПАУЗА нажата, gameOver =", gameOver, "paused =", paused);
+            
             if (gameOver) {
-                gameOver = false;
-                player.score = 0;
-                score = 0;
-                lines = 0;
-                level = 1;
-                updateScore();
-                playerReset();
-                startButton.textContent = '⏸️ ПАУЗА';
+                console.log("Запуск новой игры...");
+                startGame();
             } else {
+                console.log("Переключение паузы...");
                 togglePause();
             }
         });
@@ -1253,15 +1489,21 @@
         });
         
         // Добавляем обработчик для кнопки старта/паузы
-        const startButton = document.getElementById('start-button');
+        // Используем уже определенную переменную startButton
         startButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            console.log("Кнопка СТАРТ/ПАУЗА нажата (touchstart), gameOver =", gameOver, "paused =", paused);
+            
             if (gameOver) {
+                console.log("Запуск новой игры (touchstart)...");
                 startGame();
             } else {
+                console.log("Переключение паузы (touchstart)...");
                 togglePause();
             }
         }, { passive: false });
+        
+        // Обработчик click уже добавлен выше
         
         // Предотвращаем прокрутку страницы при нажатии на кнопки
         document.querySelectorAll('.mobile-controls button').forEach(button => {
@@ -1285,15 +1527,114 @@
         nextCanvas.style.width = `${120}px`;
         nextCanvas.style.height = `${120}px`;
         
-        // Запуск игры
-        initGame();
-        update();
+        // Создаем блестки
         createSparkles();
+        
+        // Функция для начальной инициализации игры при загрузке страницы
+        function initializeGame() {
+            console.log("Инициализация начального состояния...");
+            
+            try {
+                // Останавливаем предыдущий игровой цикл, если он был запущен
+                if (animationId !== null) {
+                    console.log("Останавливаем предыдущий игровой цикл, animationId =", animationId);
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                // Очищаем арену
+                arena.forEach(row => row.fill(0));
+                
+                // Сбрасываем счет
+                player.score = 0;
+                score = 0;
+                lines = 0;
+                level = 1;
+                updateScore();
+                
+                // Создаем первую фигуру и следующую фигуру
+                player.matrix = createPiece(Math.floor(Math.random() * pieces.length));
+                player.next = createPiece(Math.floor(Math.random() * pieces.length));
+                
+                // Устанавливаем начальную позицию
+                player.pos.y = 0;
+                player.pos.x = Math.floor((arena[0].length - player.matrix[0].length) / 2);
+                
+                // Устанавливаем начальное состояние игры - игра не запущена
+                gameOver = true;
+                paused = false;
+                startButton.textContent = '▶️ СТАРТ';
+                
+                // Сбрасываем счетчики
+                dropCounter = 0;
+                lastTime = 0;
+                
+                // Отрисовываем начальное состояние
+                draw();
+                
+                // Отображаем сообщение о начале игры
+                context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                context.font = '30px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.fillText('ТЕТРИС', canvas.width / 2, canvas.height / 2 - 30);
+                context.fillText('Нажмите СТАРТ для начала игры', canvas.width / 2, canvas.height / 2 + 30);
+                
+                // Запускаем игровой цикл только если он еще не запущен
+                if (animationId === null) {
+                    animationId = requestAnimationFrame(update);
+                    console.log("Запущен игровой цикл с animationId =", animationId);
+                }
+                
+                console.log("Начальное состояние инициализировано успешно");
+                return true;
+            } catch (e) {
+                console.error("Ошибка при инициализации игры:", e);
+                
+                // В случае ошибки, пытаемся восстановить минимальное состояние
+                gameOver = true;
+                paused = false;
+                startButton.textContent = '▶️ СТАРТ';
+                
+                // Пытаемся отобразить сообщение об ошибке
+                try {
+                    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.font = '20px Arial';
+                    context.fillStyle = 'white';
+                    context.textAlign = 'center';
+                    context.fillText('ОШИБКА ИНИЦИАЛИЗАЦИИ', canvas.width / 2, canvas.height / 2 - 30);
+                    context.fillText('Обновите страницу', canvas.width / 2, canvas.height / 2 + 30);
+                } catch (drawError) {
+                    console.error("Ошибка при отображении сообщения об ошибке:", drawError);
+                }
+                
+                return false;
+            }
+        }
+        
+        // Вызываем инициализацию игры при загрузке страницы
+        window.addEventListener('load', function() {
+            console.log("Страница загружена, инициализация игры...");
+            initializeGame();
+        });
         
         // Автоматический запуск игры на мобильных устройствах
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            console.log("Мобильное устройство обнаружено, подготовка к автозапуску...");
+            
             // Небольшая задержка для загрузки всех ресурсов
-            setTimeout(startGame, 1000);
+            window.addEventListener('load', function() {
+                setTimeout(() => {
+                    console.log("Автоматический запуск игры на мобильном устройстве");
+                    // Проверяем, что игра еще не запущена
+                    if (gameOver) {
+                        startGame();
+                    }
+                }, 2000);
+            });
             
             // Скрываем индикатор прокрутки после прокрутки
             const scrollIndicator = document.getElementById('scroll-indicator');
@@ -1315,7 +1656,20 @@
                     }, 500);
                 }, 5000);
             }
+        } else {
+            console.log("Десктопное устройство обнаружено, ожидание нажатия кнопки СТАРТ");
         }
+        
+        // Добавляем дополнительную проверку состояния игры через 3 секунды
+        setTimeout(() => {
+            console.log("Проверка состояния игры: gameOver=" + gameOver + ", paused=" + paused + ", animationId=" + animationId);
+            
+            // Если игровой цикл не запущен, запускаем его
+            if (animationId === null) {
+                console.log("Игровой цикл не запущен, запускаем...");
+                animationId = requestAnimationFrame(update);
+            }
+        }, 3000);
     </script>
 </body>
 </html>
