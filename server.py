@@ -2,7 +2,7 @@ import http.server
 import socketserver
 import os
 
-PORT = 8080  # Используем стандартный порт 8080
+PORT = 8080  # Используем порт 8080 для локального запуска
 
 class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
