@@ -703,9 +703,10 @@
             if (collide(arena, player)) {
                 player.pos.y--;
                 merge(arena, player);
-                playerReset();
-                arenaSweep();
-                updateScore();
+                arenaSweep(() => {
+                    playerReset();
+                    updateScore();
+                });
             }
             dropCounter = 0;
         }
@@ -723,9 +724,10 @@
             }
             player.pos.y--;
             merge(arena, player);
-            playerReset();
-            arenaSweep();
-            updateScore();
+            arenaSweep(() => {
+                playerReset();
+                updateScore();
+            });
             dropCounter = 0;
         }
         
@@ -763,7 +765,7 @@
             }
         }
         
-        function arenaSweep() {
+        function arenaSweep(callback = () => {}) {
             let rowCount = 0;
             let rowsToRemove = [];
             
@@ -794,7 +796,10 @@
                     dropInterval = 1000 / level;
                     
                     updateScore();
+                    callback();
                 });
+            } else {
+                callback();
             }
         }
         
