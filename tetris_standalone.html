@@ -949,14 +949,13 @@
                     // Объединяем фигуру с ареной
                     merge(arena, player);
                     
-                    // Создаем новую фигуру и проверяем на конец игры
-                    const gameEnded = playerReset();
-                    
-                    // Если игра не окончена, проверяем на заполненные линии
-                    if (!gameEnded) {
-                        arenaSweep();
-                        updateScore();
-                    }
+                    // После очистки заполненных линий создаем новую фигуру
+                    arenaSweep(() => {
+                        const ended = playerReset();
+                        if (!ended) {
+                            updateScore();
+                        }
+                    });
                 }
                 
                 // Сбрасываем счетчик падения
@@ -1009,15 +1008,13 @@
                 // Объединяем фигуру с ареной
                 merge(arena, player);
                 
-                // Создаем новую фигуру и проверяем на конец игры
-                const gameEnded = playerReset();
-                
-                // Если игра не окончена, проверяем на заполненные линии
-                if (!gameEnded) {
-                    arenaSweep();
-                    updateScore();
-                }
-                
+                arenaSweep(() => {
+                    const ended = playerReset();
+                    if (!ended) {
+                        updateScore();
+                    }
+                });
+
                 // Сбрасываем счетчик падения
                 dropCounter = 0;
                 
@@ -1138,7 +1135,7 @@
             }
         }
         
-        function arenaSweep() {
+        function arenaSweep(callback = () => {}) {
             let rowCount = 0;
             let rowsToRemove = [];
             
@@ -1174,10 +1171,13 @@
                         dropInterval = 1000 / level;
                         
                         updateScore();
+                        callback();
                     } catch (e) {
                         console.error("Ошибка при удалении строк:", e);
                     }
                 });
+            } else {
+                callback();
             }
         }
         
